@@ -1,0 +1,37 @@
+# EO camera + ToF depth pair co-boresighted on each satellite
+
+sensors:
+  - id: primary_rgb
+    type: camera
+    modality: rgb
+    width_px: 1280
+    height_px: 720
+    focal_length_mm: 35.0
+    pixel_size_um: 3.45
+    frame_rate_hz: 1.0
+    pose:
+      position_body_m: [0.0, 0.0, 0.2]
+      # attitude: identity implied until quaternion config lands
+
+  - id: primary_tof
+    type: tof
+    width_px: 640
+    height_px: 480
+    min_range_m: 1.0
+    max_range_m: 50.0
+    range_resolution_m: 0.02
+    modulation_frequency_hz: 30.0e6
+    frame_rate_hz: 10.0
+    pose:
+      position_body_m: [0.05, 0.0, 0.2]
+
+effects:
+  rgb:
+    - type: gaussian_noise
+      rgb_sigma: 0.01
+  tof:
+    - type: gaussian_noise
+      depth_sigma_m: 0.05
+    - type: tof_artifacts
+      flying_pixel_prob: 0.02
+      multipath_bias_m: 0.0

@@ -1,0 +1,227 @@
+[project]
+name = "satsim"
+version = "0.1.0"
+description = "Scalable satellite constellation simulator with synthetic imagery, sensor modeling, and computer-vision-driven autonomy."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+authors = [
+    { name = "SatSim Contributors" },
+]
+keywords = [
+    "satellite",
+    "constellation",
+    "orbital-dynamics",
+    "synthetic-data",
+    "computer-vision",
+    "simulation",
+    "autonomy",
+    "space",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Typing :: Typed",
+]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+    "structlog>=24.1",
+    "typing-extensions>=4.9",
+]
+
+[project.optional-dependencies]
+# Orbital propagation backends and ephemeris utilities
+astro = [
+    "astropy>=6.0",
+    "poliastro>=0.17",
+]
+# Synthetic imagery / rendering / geometry
+render = [
+    "pillow>=10.2",
+    "opencv-python-headless>=4.9",
+    "trimesh>=4.1",
+]
+# Deep learning / perception stack
+vision = [
+    "torch>=2.1",
+    "torchvision>=0.16",
+    "ultralytics>=8.1",
+]
+# Reinforcement learning / multi-agent tasking (future)
+rl = [
+    "gymnasium>=0.29",
+    "pettingzoo>=1.24",
+]
+# Developer / CI tooling
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "pytest-mock>=3.12",
+    "hypothesis>=6.98",
+    "ruff>=0.3",
+    "mypy>=1.8",
+    "pre-commit>=3.6",
+    "types-PyYAML>=6.0",
+    "types-Pillow>=10.2",
+]
+# Convenience meta-extra: install everything commonly needed for local work
+all = [
+    "satsim[astro,render,vision,rl,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/satsim/satsim"
+Documentation = "https://github.com/satsim/satsim#readme"
+Repository = "https://github.com/satsim/satsim"
+Issues = "https://github.com/satsim/satsim/issues"
+
+[project.scripts]
+satsim = "satsim.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+# src/satsim is auto-discovered by hatchling (src layout).
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/configs",
+    "/scripts",
+    "/README.md",
+    "/pyproject.toml",
+    "/LICENSE",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff — lint + format
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific
+    "ANN", # type annotations (relaxed in tests)
+    "D",   # pydocstyle
+]
+ignore = [
+    "D100", # missing docstring in public module (package __init__ may be sparse)
+    "D104", # missing docstring in public package
+    "ANN101", # self annotation (deprecated convention)
+    "ANN102", # cls annotation
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN", "D", "S101"]
+"scripts/**" = ["ANN", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["satsim"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unreachable = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+show_error_codes = true
+pretty = true
+mypy_path = "src"
+packages = ["satsim"]
+
+[[tool.mypy.overrides]]
+module = [
+    "poliastro.*",
+    "cv2.*",
+    "ultralytics.*",
+    "trimesh.*",
+]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+]
+markers = [
+    "unit: fast isolated unit tests",
+    "integration: multi-component integration tests",
+    "slow: long-running or resource-heavy tests",
+    "gpu: requires CUDA / GPU",
+    "orbital: orbital dynamics / propagation tests",
+    "vision: perception / CV pipeline tests",
+    "render: synthetic imagery / sensor rendering tests",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["satsim"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 0
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+    "pass",
+]

@@ -1,0 +1,25 @@
+# Example Walker-Delta constellation parameters
+# ---------------------------------------------
+# Full Walker generation will live in core/application constellation builders.
+
+type: walker_delta
+name: demo_walker_t6_p2_f1
+
+# Walker-Delta notation T/P/F with inclination
+total_satellites: 6
+num_planes: 2
+relative_phasing: 1
+inclination_deg: 53.0
+
+orbit:
+  altitude_m: 550000.0
+  eccentricity: 0.0
+  arg_perigee_rad: 0.0
+  # raan_spread handled by plane distribution
+
+central_body: earth
+propagator:
+  model: two_body
+  include_j2: false
+  include_drag: false
+  max_step_s: 30.0

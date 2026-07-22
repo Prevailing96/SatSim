@@ -1,0 +1,21 @@
+# Default perception stack configuration
+
+detector:
+  backend: stub  # options later: yolov8, custom_torch, ...
+  score_threshold: 0.25
+  device: cpu
+  # weights: models/detector.pt
+
+segmenter:
+  backend: stub  # options later: mask_rcnn, sam, custom_torch, ...
+  enabled: true
+  # weights: models/segmenter.pt
+
+tracking:
+  enabled: false
+  backend: none
+
+export:
+  save_detections: true
+  save_masks: true
+  format: satsim_bundle  # see infrastructure.io.export

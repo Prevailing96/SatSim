@@ -1,0 +1,90 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.*
+!.env.example
+
+# Tooling / type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+.pytype/
+.pyre/
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Project artifacts (simulation outputs, models, caches)
+outputs/
+runs/
+artifacts/
+checkpoints/
+data/raw/
+data/processed/
+data/external/
+*.log
+logs/
+
+# Large model weights / binary assets (track via DVC/LFS later if needed)
+*.pt
+*.pth
+*.onnx
+*.engine
+*.bin
+*.h5
+*.hdf5
+*.npz
+*.npz2
+
+# Local secrets / credentials
+secrets/
+*.pem
+*.key
+credentials.json
+
+# uv / poetry lock alternatives (keep whichever you commit)
+# poetry.lock  — commit if using Poetry
+# uv.lock      — commit if using uv
+
+# Temporary / scratch
+tmp/
+temp/
+scratch/
+.cache/

@@ -1,0 +1,16 @@
+# Short smoke-test scenario for CI / local wiring checks
+
+name: fast_smoke
+
+simulation:
+  duration_s: 10.0
+  dt_s: 1.0
+  seed: 0
+  n_satellites: 3
+
+constellation: configs/constellation/walker_delta_example.yaml
+sensors: configs/sensors/eo_tof_pair.yaml
+vision: configs/vision/default_perception.yaml
+
+autonomy:
+  enable_cv_tasking: false
