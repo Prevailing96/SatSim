@@ -16,7 +16,11 @@ from satsim.core.sensors.observations import (
 )
 from satsim.core.types.identifiers import SatelliteId, SensorId
 from satsim.core.types.time import SimTime
-from satsim.infrastructure.vision.detector import ObjectDetector, StubObjectDetector
+from satsim.infrastructure.vision.detector import (
+    ObjectDetector,
+    RuleBasedBlobDetector,
+    StubObjectDetector,
+)
 from satsim.infrastructure.vision.segmenter import Segmenter, StubSegmenter
 
 
@@ -45,6 +49,20 @@ class PerceptionPipeline:
             detector=StubObjectDetector(),
             segmenter=StubSegmenter(),
             score_threshold=0.25,
+        )
+
+    @classmethod
+    def rule_based(cls) -> PerceptionPipeline:
+        """Factory for a pipeline using the first real (rule-based) detector.
+
+        Returns:
+            Pipeline with :class:`~satsim.infrastructure.vision.detector.RuleBasedBlobDetector`
+            and no segmenter.
+        """
+        return cls(
+            detector=RuleBasedBlobDetector(),
+            segmenter=None,
+            score_threshold=0.4,
         )
 
     def process(

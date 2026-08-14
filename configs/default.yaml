@@ -2,6 +2,14 @@
 # -------------------------------------
 # This file is intentionally conservative: short duration, single-step-friendly
 # settings, and references to sibling config fragments.
+#
+# Ground targets (see TwoBodyEnvironment.default_demo_targets) are placed by
+# geographic coordinates on the constellation's shared ground track, each
+# ~25 degrees of true anomaly ahead of one satellite's starting position —
+# so nothing is trivially under a satellite at t=0. With this duration/step,
+# each satellite discovers its own target around t=385-412s. Target/sensor
+# config wiring from this YAML (below) is not implemented yet; the demo
+# scene is currently built in code.
 
 name: default_leo_demo
 

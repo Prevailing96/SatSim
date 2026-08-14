@@ -100,6 +100,23 @@ def _cmd_run(config: str, dry_run: bool) -> int:
         f"[satsim] done: dynamics_steps={n_dyn} final_t={final.time.seconds:.3f}s "
         f"sats={len(final.states)} truncated={final.truncated}"
     )
+
+    total_detections = sum(len(bundle.detections) for r in history for bundle in r.observations)
+    first_detection_t = next(
+        (r.time.seconds for r in history if any(b.detections for b in r.observations)),
+        None,
+    )
+    tasking_events = sum(
+        1
+        for r in history
+        for action in r.infos.get("agent_actions", {}).values()
+        if action.get("kind") == "task"
+    )
+    print(
+        f"[satsim] perception: total_detections={total_detections} "
+        f"first_detection_t={first_detection_t}"
+    )
+    print(f"[satsim] tasking: reactive_task_events={tasking_events}")
     return 0
 
 

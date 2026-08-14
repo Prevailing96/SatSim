@@ -2,7 +2,16 @@
 
 **Scalable satellite constellation simulation with synthetic imaging, sensor modeling, and computer-vision-driven autonomy.**
 
-SatSim is a professional-grade research and engineering platform for studying how fleets of satellites sense, decide, and act. It couples high-fidelity orbital dynamics with photorealistic (and sensor-realistic) synthetic imagery — including RGB, multispectral, and time-of-flight / depth channels — then closes the loop through a computer-vision perception stack that can influence tasking and onboard autonomy.
+SatSim is a professional-grade research and engineering platform for studying how fleets of satellites sense, decide, and act. It couples two-body orbital dynamics with ray-traced, sensor-realistic synthetic imagery — shaded Earth, geographically placed ground targets, RGB and depth channels — then closes the loop through a classical computer-vision perception stack that drives per-satellite tasking and constellation-wide deconfliction.
+
+The full loop runs today: `satsim run -c configs/default.yaml` propagates a 3-satellite constellation, renders and perceives each satellite's camera view every step, and reacts to what it finds.
+
+```text
+[satsim] perception: total_detections=83 first_detection_t=385.0
+[satsim] tasking: reactive_task_events=3
+```
+
+(83 raw detections across three targets and three satellites, but only 3 tasking events — the constellation shares task awareness, so the same target isn't tasked twice. See [Core concepts](#core-concepts).)
 
 ---
 
@@ -79,14 +88,14 @@ This separation keeps orbital math free of ML dependencies and keeps vision code
 
 ## Feature roadmap (initial → mature)
 
-| Area | Near-term scaffold | Direction |
-|------|--------------------|-----------|
-| **Orbital dynamics** | State vectors, Keplerian elements, two-body propagator interface | High-order integrators, J2/drag, multi-body, maneuver burns |
-| **Constellations** | Walker / custom slot configs | Coverage metrics, inter-sat links, swarm geometries |
-| **Synthetic data** | Image + depth frame contracts, scene descriptors | Path-traced / raster EO, BRDF, atmosphere, cloud layers |
-| **Sensors** | RGB + ToF/depth effect interfaces | PSF, MTF, shot/read noise, quantization, ToF multipath & flying pixels |
-| **Perception** | Detection & segmentation result schemas | Training data export, online inference, multi-object tracking |
-| **Autonomy** | Tasking request / agent policy protocols | Closed-loop retasking, multi-agent coordination |
+| Area | Where it stands today | Direction |
+|------|------------------------|-----------|
+| **Orbital dynamics** | Real universal-variable two-body propagator (elliptical/parabolic/hyperbolic); Keplerian elements | High-order integrators, J2/drag, multi-body, maneuver burns |
+| **Constellations** | Evenly-phased demo constellation built in code; Walker-Delta config exists but isn't parsed into it yet | Full YAML → constellation wiring, coverage metrics, inter-sat links |
+| **Synthetic data** | Ray-traced Earth sphere (Lambertian shading, limb darkening, atmospheric limb glow) + geometrically consistent depth; geographic (lat/lon) multi-target placement with limb occlusion | Textures, path-traced / raster EO, BRDF, cloud layers |
+| **Sensors** | Real effect pipeline: PSF blur, shot+read noise, 8-bit quantization (RGB); range-dependent noise, flying-pixel/multipath artifacts, range quantization (depth) | MTF, dedicated ToF sensor requests, calibration error models |
+| **Perception** | `RuleBasedBlobDetector`: color threshold + connected components + geometric gating (solidity, aspect ratio, size) + heuristic confidence; multi-target aware | Learned detectors (YOLO / torch) under the `vision` extra, tracking |
+| **Autonomy** | `SatelliteAgent` reacts to detections; `PriorityQueueScheduler` shared across the constellation as a task board with spatial deconfliction (no double-tasking the same target) | Richer policies, visibility/power-aware scheduling, task completion lifecycle |
 | **RL** | Environment protocol hooks | Gymnasium / PettingZoo wrappers, curriculum scenarios |
 
 ---
@@ -136,9 +145,13 @@ python -m satsim --help
 pytest -m unit
 ```
 
-### Example config-driven entry (as the API matures)
+### Run a scenario
 
 ```bash
+# Via the console script (prints detection/tasking summary)
+satsim run -c configs/default.yaml
+
+# Or the operator script (structured logging, same underlying ScenarioRunner)
 python scripts/run_scenario.py --config configs/default.yaml
 ```
 
@@ -148,32 +161,35 @@ python scripts/run_scenario.py --config configs/default.yaml
 
 ### Simulation step (closed loop)
 
-A single logical step of the environment is intended to look like:
+Every `TwoBodyEnvironment.reset()` / `.step()` call runs the full loop, not a stub of it:
 
-1. **Advance** simulation clock and orbital state for all vehicles.
-2. **Sense** — for each tasked sensor, render a synthetic observation and apply sensor effects (noise, blur, ToF artifacts).
-3. **Perceive** — run detection / segmentation (and later tracking) on those observations.
-4. **Decide** — agents / tasking policies update schedules from perception products and mission goals.
-5. **Act** — apply attitude slews, mode changes, or (later) Δv maneuvers; emit logs and metrics.
+1. **Advance** — propagate every satellite's orbital state (real two-body dynamics).
+2. **Sense** — ray-trace each satellite's nadir camera against Earth and the scene's ground targets (`PlaceholderRenderer`), then run the sensor-effect pipeline (blur, shot/read noise, quantization for RGB; range-dependent noise, flying-pixel artifacts, quantization for depth).
+3. **Perceive** — `RuleBasedBlobDetector` finds and shape-filters candidate targets, scoring each with a heuristic confidence.
+4. **Decide** — each satellite's `SatelliteAgent` reacts to qualifying detections, submitting `TaskRequest`s to a `PriorityQueueScheduler` **shared across the whole constellation** — so a satellite checks constellation-wide task state before tasking a target another satellite already has covered.
+5. **Act** *(future)* — attitude slews, mode changes, Δv maneuvers.
 
-Perception is not an offline post-process; it is an input to autonomy.
+Perception is not an offline post-process; it is a real input to autonomy every step, and `StepResult.infos` exposes the outcome (`n_detections`, `agent_actions`, `constellation_active_tasks`) for inspection or logging.
 
-### Synthetic imagery & ToF
+### Synthetic imagery & sensor realism
 
-SatSim treats **depth / time-of-flight** as a first-class modality alongside electro-optical imagery. Starter modules define:
+SatSim treats depth as a first-class modality alongside electro-optical imagery, and both are geometrically and radiometrically real rather than placeholders:
 
-- frame metadata (pose, FOV, wavelength / timing),
-- ideal rendered channels,
-- sensor-effect pipelines that corrupt ideal channels into realistic measurements,
-- ground-truth labels aligned for CV training and evaluation.
+- **Rendering** (`infrastructure/rendering`): ray/sphere intersection against Earth with Lambertian shading from a fixed sun direction, linear limb darkening, and a soft atmospheric glow at the disk edge in wide-FOV views; scene objects are projected as marker patches with proper Earth-limb occlusion.
+- **Sensor effects** (`infrastructure/sensors`): a composable `SensorPipeline` of effects — PSF blur, signal-dependent shot noise + read noise, bit-depth quantization for RGB; range-dependent noise, flying-pixel/multipath artifacts, and range quantization for depth.
+- **Ground truth**: instance ID maps and per-object scene metadata stay available for future dataset export, independent of what the classical detector can actually see.
 
 ### Perception products
 
-Detections and masks are structured value objects so that:
+Detections are structured value objects (`Detection2D`, with an extensible `metadata` dict for diagnostics like solidity/aspect ratio) so that:
 
 - evaluation metrics stay consistent,
-- tasking logic can subscribe to perception events,
+- tasking logic subscribes to real perception output every step, not synthetic events,
 - datasets can be exported without ad-hoc dicts.
+
+### Multi-satellite coordination
+
+Ground targets are placed by geographic coordinates (`GroundTargetSpec` + `geodetic_to_ecef_spherical`) on the constellation's shared ground track, not trivially under a satellite at `t=0`. Because every `SatelliteAgent` in the environment is given the *same* `PriorityQueueScheduler` instance, `PriorityQueueScheduler.find_active_near()` gives simple, spatial deconfliction: before submitting a task, an agent checks whether a non-terminal task already exists near its detection's approximate location (the satellite's own nadir point — not true geolocation), and skips submission if so. This is what keeps `reactive_task_events` far below `total_detections` in the example at the top of this README.
 
 ---
 
@@ -190,6 +206,8 @@ Configs under `configs/` are the primary way to define experiments:
 | `configs/simulation/` | Time step, duration, logging, seeds |
 
 Pydantic settings models (in `infrastructure/io` and domain config types) validate configs before a run starts.
+
+Note: `constellation`, `sensors`, and `vision` are currently just path strings carried through `ScenarioConfig` — the demo constellation, ground targets (`TwoBodyEnvironment.default_demo_targets`), camera model, and sensor-effect pipeline are still built in code, not parsed from these YAML fragments yet. `configs/default.yaml` documents the current demo scenario's geometry (target placement, expected detection timing) in comments until that wiring lands.
 
 ---
 
@@ -253,14 +271,15 @@ Install only what you need for a given research track.
 
 ## Project status
 
-**Alpha scaffold.** The repository currently provides:
+**Alpha, but the core loop is real.** The repository provides:
 
-- production project layout and packaging,
-- typed module boundaries and interfaces,
-- baseline configs and smoke CLI,
-- test skeleton ready for growth.
+- a real two-body propagator and a working `reset()`/`step()` simulation loop,
+- ray-traced synthetic imagery (shaded Earth, occlusion, atmosphere) with a real RGB + depth sensor-effect pipeline,
+- a classical detector with geometric shape filtering and heuristic confidence — not just a stub returning empty results,
+- geographically placed, multi-target scenarios with constellation-wide task deconfliction,
+- production project layout, typed module boundaries, and a test suite that exercises all of the above (unit, integration, property).
 
-High-fidelity propagators, full renderers, trained models, and RL environments will land incrementally on this skeleton without structural rewrites.
+Still ahead: J2/drag and richer orbital perturbations, YAML-driven constellation/sensor/target configuration (currently built in code), learned detectors under the `vision` extra, task completion lifecycle, and RL environment wrappers. These are expected to land incrementally on the existing architecture without structural rewrites — the `core` / `application` / `infrastructure` separation is what lets a new renderer, sensor model, detector, or coordination rule get added without touching the layers above or below it, which is exactly how the current feature set was built.
 
 ---
 

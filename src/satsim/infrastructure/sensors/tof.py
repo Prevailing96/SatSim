@@ -55,8 +55,14 @@ class ToFArtifactModel:
         if self.multipath_bias_m != 0.0:
             depth = depth + np.float32(self.multipath_bias_m)
 
-        # Invalid outside unambiguous / usable range.
-        invalid = (depth < self.min_range_m) | (depth > self.max_range_m)
+        # Invalid outside unambiguous / usable range. Depth may already
+        # contain NaN (no-return pixels); compare a NaN-substituted copy so
+        # no comparison ever touches NaN directly (numpy warns-as-error on
+        # that under this project's pytest config).
+        finite = np.isfinite(depth)
+        safe_depth = np.where(finite, depth, 0.0)
+        out_of_range = (safe_depth < self.min_range_m) | (safe_depth > self.max_range_m)
+        invalid = ~finite | out_of_range
         depth[invalid] = np.nan
 
         if self.flying_pixel_prob > 0.0:
@@ -92,10 +98,15 @@ class ToFArtifactModel:
         Returns:
             Depth with flying-pixel corruption.
         """
-        # Simple edge map via finite differences.
-        gy = np.abs(np.diff(depth, axis=0, prepend=depth[:1, :]))
-        gx = np.abs(np.diff(depth, axis=1, prepend=depth[:, :1]))
-        edges = (gx + gy) > self.edge_gradient_threshold
+        # Simple edge map via finite differences, computed on a
+        # NaN-substituted copy so the threshold comparison never touches a
+        # raw NaN (some pixels here may already be invalidated to NaN by
+        # the range check above).
+        finite = np.isfinite(depth)
+        safe = np.where(finite, depth, 0.0).astype(np.float32)
+        gy = np.abs(np.diff(safe, axis=0, prepend=safe[:1, :]))
+        gx = np.abs(np.diff(safe, axis=1, prepend=safe[:, :1]))
+        edges = finite & ((gx + gy) > self.edge_gradient_threshold)
         mask = edges & (rng.random(depth.shape) < self.flying_pixel_prob)
         if not np.any(mask):
             return depth
@@ -103,7 +114,7 @@ class ToFArtifactModel:
         # Mix with a random neighbor-like offset.
         noise = rng.normal(0.0, 0.5, size=depth.shape).astype(np.float32)
         out = depth.copy()
-        out[mask] = depth[mask] + noise[mask]
+        out[mask] = safe[mask] + noise[mask]
         return out
 
 

@@ -11,6 +11,11 @@ from typing import Protocol, runtime_checkable
 
 from satsim.application.tasking.requests import TaskRequest, TaskStatus
 from satsim.core.types.time import SimTime
+from satsim.core.types.vectors import Vec3
+
+#: Non-terminal task statuses — still "active" from a deconfliction
+#: standpoint, whether or not they've started executing yet.
+_ACTIVE_STATUSES = frozenset({TaskStatus.PENDING, TaskStatus.SCHEDULED, TaskStatus.IN_PROGRESS})
 
 
 @runtime_checkable
@@ -93,6 +98,37 @@ class PriorityQueueScheduler:
             TaskStatus.CANCELLED,
         }
         return [r for r in self._queue if r.status not in terminal]
+
+    def find_active_near(self, location_m: Vec3, radius_m: float) -> TaskRequest | None:
+        """Find a non-terminal task whose target is within ``radius_m``.
+
+        This is the constellation's shared-awareness/deconfliction check:
+        every :class:`~satsim.application.agents.satellite_agent.SatelliteAgent`
+        given the *same* scheduler instance queries it before submitting a
+        new task, so a target already being handled — by this satellite or
+        any other sharing the scheduler — isn't re-tasked. Deliberately
+        simple: linear scan and a single distance gate, no track fusion.
+
+        Args:
+            location_m: Query location (scene/ECI frame) [m].
+            radius_m: Match radius [m]; tasks with no ``target_location_m``
+                are never matched (nothing to compare against).
+
+        Returns:
+            The first matching non-terminal task, or ``None``.
+        """
+        for req in self._queue:
+            if req.status not in _ACTIVE_STATUSES:
+                continue
+            if req.target_location_m is None:
+                continue
+            if (req.target_location_m - location_m).norm() <= radius_m:
+                return req
+        return None
+
+    def clear(self) -> None:
+        """Remove all tasks, restoring the scheduler to its initial state."""
+        self._queue.clear()
 
 
 __all__ = ["PriorityQueueScheduler", "TaskScheduler"]

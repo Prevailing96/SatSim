@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from satsim.core.types.identifiers import SatelliteId, SensorId
 from satsim.core.types.time import SimTime
+from satsim.core.types.vectors import Vec3
 
 
 class TaskPriority(int, Enum):
@@ -50,6 +51,12 @@ class TaskRequest:
             image crop id, etc.).
         status: Current lifecycle status.
         metadata: Extensible payload (e.g. CV trigger detection id).
+        target_location_m: Approximate world-space location the triggering
+            detection was made near (scene/ECI frame), if known. Used for
+            simple spatial deconfliction — see
+            :meth:`~satsim.application.tasking.scheduler.PriorityQueueScheduler.find_active_near`.
+            Not a precise geolocation; see
+            :func:`~satsim.application.agents.satellite_agent.approximate_target_location`.
     """
 
     satellite_id: SatelliteId
@@ -61,6 +68,7 @@ class TaskRequest:
     status: TaskStatus = TaskStatus.PENDING
     request_id: str = field(default_factory=lambda: str(uuid4()))
     metadata: dict[str, Any] = field(default_factory=dict)
+    target_location_m: Vec3 | None = None
 
 
 __all__ = ["TaskPriority", "TaskRequest", "TaskStatus"]

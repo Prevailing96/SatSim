@@ -76,6 +76,9 @@ class Detection2D:
         x_max: Right edge [px].
         y_max: Bottom edge [px].
         track_id: Optional multi-frame track id.
+        metadata: Detector-specific diagnostics backing ``confidence`` (e.g.
+            solidity, aspect ratio, matched pixel count) — informational,
+            no consumer should depend on specific keys existing.
     """
 
     class_id: int
@@ -86,6 +89,7 @@ class Detection2D:
     x_max: float
     y_max: float
     track_id: int | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def width(self) -> float:
